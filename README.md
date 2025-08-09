@@ -176,7 +176,7 @@ python-dotenv
    ```
    GROQ_API_KEY=your_api_key_here
    ```
-4. Run the Jupyter notebook
+4. Run the Jupyter ```(beer_v2.ipynb)``` notebook
 
 ## Usage
 
