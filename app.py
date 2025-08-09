@@ -123,7 +123,7 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         
         output += "📍 Here's what matches your exact request:\n"
         if recommendations:
-            for i, beer in enumerate(recommendations[:2], 1):
+            for i, beer in enumerate(recommendations[:3], 1):
                 output += f"{i}. {beer['name']} ({beer['rating']:.2f}★ - {int(beer['num_reviews'])} reviews)\n"
                 output += f"   Distance: {beer['distance']:.3f}\n"
         else:
@@ -131,7 +131,7 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         
         output += "\n💡 Suggested Alternatives (similar but better rated):\n"
         if alt_recommendations:
-            for i, beer in enumerate(alt_recommendations[:2], 1):
+            for i, beer in enumerate(alt_recommendations[:3], 1):
                 output += f"{i}. {beer['name']} ({beer['rating']:.2f}★ - {int(beer['num_reviews'])} reviews)\n"
                 output += f"   Distance: {beer['distance']:.3f}\n"
         else:
