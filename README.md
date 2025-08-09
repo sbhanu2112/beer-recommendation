@@ -14,7 +14,7 @@ But that's not all! If the flavor profile rates poorly, the system will:
 
 Enjoy smarter beer choices tailored just for you!
 
-#### Note: This Project also has web user interface ready for use : https://recommendbeer.streamlit.app/ Enjoy!
+#### Note: This Project also has web app ready for use : https://recommendbeer.streamlit.app/ Enjoy!
 
 ## System Architecture
 
