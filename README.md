@@ -1,5 +1,7 @@
 # Rating-Aware Beer 🍺 Recommendation System
 
+### Note: This Project also has web user interface ready for use : https://recommendbeer.streamlit.app/ Enjoy!
+
 This is an intelligent beer recommendation system that combines **predictive quality assessment** with **similarity-based recommendations** to provide both what users want and educational guidance about better alternatives.
 
 Simply give a prompt describing what you are craving, and the system will:
