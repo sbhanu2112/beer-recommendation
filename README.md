@@ -176,9 +176,7 @@ python-dotenv
    ```
    GROQ_API_KEY=your_api_key_here
    ```
-4. Download the [Beer Profile and Ratings Dataset](https://www.kaggle.com/datasets/ruthgn/beer-profile-and-ratings-data-set)
-5. Place the CSV file in a `data/` folder
-6. Run the Jupyter notebook
+4. Run the Jupyter notebook
 
 ## Usage
 
