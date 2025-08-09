@@ -198,14 +198,14 @@ def main():
         st.session_state.selected_query = user_input
     
     # Example queries
-    st.markdown("**Can't make your mind? Try these:**")
+    st.markdown("**Can't make up your mind? Try these:**")
     
     examples = [
         "I want a light 🍊 citrusy beer",
         "Give me a 🌺 hoppy IPA with tropical notes",
         "I want a sessionable pilsner",
         "Something 🍋 sour and funky with brett character",
-        "Just a Bad beer"
+        "Just a Bad beer 😐"
     ]
     
     # Create buttons in columns
