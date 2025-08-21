@@ -474,7 +474,7 @@ class BeerRecommender:
         test_point_recommendation_np = test_point_recommendation.values[0]
         
         # Use min of 10 or number of available beers
-        n_neighbors = min(10, len(X_recommend_scaled_np))
+        n_neighbors = min(5, len(X_recommend_scaled_np))
         knn = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
         knn.fit(X_recommend_scaled_np)
         
