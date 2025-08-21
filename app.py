@@ -158,8 +158,8 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         output += "━" * 60 + "\n\n"
         
         output += "🍺 Top Recommendations:\n"
-        for i, beer in enumerate(recommendations[:2], 1):
-            output += f"\n{i}. {beer['name']}\n"
+        for i, beer in enumerate(recommendations[:3], 1):
+            output += f"{i}. {beer['name']}\n"
             output += f"   Rating: {beer['rating']:.2f}/5 ({int(beer['num_reviews'])} reviews)\n"
             output += f"   Distance: {beer['distance']:.3f}\n"
             
@@ -231,7 +231,7 @@ def main():
         "Give me a 🌺 hoppy IPA with tropical notes",
         "I want a sessionable pilsner",
         "Something 🍋 sour and funky with brett character",
-        "Just a Bad beer"
+        "Just a Bad beer 😐"
     ]
     
     # Create buttons in columns
