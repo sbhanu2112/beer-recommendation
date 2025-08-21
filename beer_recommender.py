@@ -73,6 +73,18 @@ class BeerRecommender:
                       'Extra Strong'
         )
         
+        # Load country data
+        beer_countries = pd.read_csv('./beer_names_country_latest.csv')
+        beer_countries = beer_countries.drop(columns=['Name'])
+        
+        # Merge with country data
+        self.df = pd.merge(
+            self.df,
+            beer_countries,
+            how="inner",
+            on="Beer Name (Full)"
+        )
+        
         self.df = self.df.drop(columns=['Min IBU', 'Max IBU', 'review_aroma', 
                                         'review_appearance', 'review_palate', 
                                         'review_taste', 'Beer Name (Full)', 'Brewery'])
@@ -90,7 +102,7 @@ class BeerRecommender:
         return False
     
     def train_regression_model(self):
-        reg_df = self.df.drop(columns=['number_of_reviews', 'strength', 'Name', 'Description'])
+        reg_df = self.df.drop(columns=['number_of_reviews', 'strength', 'Name', 'Description', 'Country'])
         
         cols = reg_df.columns.tolist()
         cols[-2], cols[-1] = cols[-1], cols[-2]
@@ -161,6 +173,7 @@ class BeerRecommender:
                             - Malty: (int) 0-239
                             - mainstream: (int) 0 or 1 (DEFAULT = 1)
                             - style: (string) Beer style category
+                            - region: (string or null) Country of origin - DEFAULT = null (only use: "United States", "Belgium", "Germany", "United Kingdom", "Canada", "Japan", or null)
 
                             ## IMPORTANT: Mainstream Flag Rules
                             DEFAULT mainstream = 1 (always start with 1)
@@ -177,6 +190,35 @@ class BeerRecommender:
                             - Any request without special keywords above
                             - "Sessionable", "refreshing", "light" beers
                             - When in doubt, use mainstream = 1
+
+                            ## IMPORTANT: Region/Country Rules
+                            DEFAULT region = null (always start with null)
+
+                            Only set region to one of these 6 countries when EXPLICITLY mentioned:
+                            - "United States" (also for: US, USA, America, American, from United States)
+                            - "Belgium" (also for: Belgian)
+                            - "Germany" (also for: German, Deutschland)
+                            - "United Kingdom" (also for: UK, British, England, English, from the United Kingdom)
+                            - "Canada" (also for: Canadian)
+                            - "Japan" (also for: Japanese)
+
+                            Keep region = null when:
+                            - No country/origin is mentioned
+                            - User mentions a country not in the allowed list
+                            - User mentions general terms like "imported", "foreign", "domestic"
+                            - When in doubt, use null
+
+                            Region mapping examples:
+                            - "American IPA" → region: "United States"
+                            - "Belgian tripel" → region: "Belgium"  
+                            - "German pilsner" → region: "Germany"
+                            - "I want a beer from Japan" → region: "Japan"
+                            - "British ale" → region: "United Kingdom"
+                            - "Canadian lager" → region: "Canada"
+                            - "from United States" → region: "United States"
+                            - "from the United Kingdom" → region: "United Kingdom"
+                            - "French beer" → region: null (not in allowed list)
+                            - "hoppy IPA" → region: null (no country mentioned)
 
                             ## Scaling Guidelines
                             Use percentages of max range:
@@ -265,12 +307,15 @@ class BeerRecommender:
                             3. Apply flavor descriptors (additive)
                             4. Apply negations last (no sweetness, etc.)
                             5. Check mainstream flag (default = 1 unless special style)
+                            6. Check region flag (default = null unless explicitly mentioned)
 
                             ## Examples
-                            "hoppy IPA" → Start with IPA template, already has high hoppy
-                            "light beer" → Use Light Beer template
-                            "Belgian tripel" → Use Tripel template, set mainstream = 0
-                            "dessert stout" → Stout template + high sweet/body, mainstream = 0
+                            "hoppy IPA" → Start with IPA template, already has high hoppy, region: null
+                            "light beer" → Use Light Beer template, region: null
+                            "Belgian tripel" → Use Tripel template, set mainstream = 0, region: "Belgium"
+                            "dessert stout" → Stout template + high sweet/body, mainstream = 0, region: null
+                            "German pilsner" → Pilsner template, region: "Germany"
+                            "I want a strong lager from United States" → Lager template with strong modifiers, region: "United States"
 
                             ## Special Edge Cases
 
@@ -292,12 +337,13 @@ class BeerRecommender:
                             - Malty: 15-25
                             - mainstream: 1
                             - style: "Low Alcohol Beer" or "Light Beer"
+                            - region: null
 
                             Examples:
-                            - "Just a bad beer" → Minimal everything
-                            - "Give me your worst beer" → Lowest possible values
-                            - "I want a terrible beer" → Near-zero features
-                            - "Something awful" → Minimum profile
+                            - "Just a bad beer" → Minimal everything, region: null
+                            - "Give me your worst beer" → Lowest possible values, region: null
+                            - "I want a terrible beer" → Near-zero features, region: null
+                            - "Something awful" → Minimum profile, region: null
 
                             ### Testing/Experimental Requests
                             If user mentions "test", "experiment", or asks for unusual combinations that would clearly conflict (e.g., "extremely sweet AND extremely bitter AND light body"), recognize this as potentially problematic and generate values that reflect the conflict.
@@ -371,7 +417,7 @@ class BeerRecommender:
         return test_point
     
     def get_beer_recommendations(self, llm_output, alt=False, alt_rating_threshold=3.0):
-        X_recommend = self.df[['Style'] + self.scaling_features + ['mainstream', 'strength']].copy()
+        X_recommend = self.df[['Style'] + self.scaling_features + ['mainstream', 'strength', 'Country']].copy()
         y_recommend = self.df[['Name', 'Description', 'review_overall', 'number_of_reviews']].copy()
         
         X_recommend['Style'] = X_recommend['Style'].str.split(' - ').str[0].str.split(' / ').str[0]
@@ -382,23 +428,34 @@ class BeerRecommender:
         encoded_df = pd.DataFrame(encoded_array, columns=feature_names, index=X_recommend.index)
         X_recommend = pd.concat([X_recommend.drop('Style', axis=1), encoded_df], axis=1)
         
+        # Filter by rating if alt recommendations
         if alt:
             rating_mask = y_recommend['review_overall'] >= alt_rating_threshold
             X_recommend = X_recommend[rating_mask]
             y_recommend = y_recommend[rating_mask]
         
+        # Filter by region if specified
+        if llm_output.get('region') is not None:
+            country_mask = X_recommend['Country'].str.lower() == llm_output['region'].lower()
+            X_recommend = X_recommend[country_mask]
+            y_recommend = y_recommend[country_mask]
+        
+        # Filter by mainstream
         if llm_output['mainstream'] == 1:
             mainstream_mask = X_recommend['mainstream'] == 1
             X_recommend = X_recommend[mainstream_mask]
             y_recommend = y_recommend[mainstream_mask]
         
+        # Filter by strength
         strength = self.get_strength(llm_output['ABV'])
         strength_mask = X_recommend['strength'] == strength
         X_recommend_sub = X_recommend[strength_mask]
         y_recommend_sub = y_recommend[strength_mask]
         
-        X_recommend_sub = X_recommend_sub.drop(columns=['strength', 'mainstream'])
+        # Drop columns used for filtering
+        X_recommend_sub = X_recommend_sub.drop(columns=['strength', 'mainstream', 'Country'])
         
+        # Scale features
         X_recommend_sub[self.scaling_features] = self.global_scaler_recommend.transform(
             X_recommend_sub[self.scaling_features]
         )
@@ -407,17 +464,23 @@ class BeerRecommender:
         X_recommend_scaled_np = X_recommend_scaled.to_numpy()
         y_recommend_np = y_recommend_sub.to_numpy()
         
+        # If no beers match the criteria, return empty list
+        if len(X_recommend_scaled_np) == 0:
+            return []
+        
         test_point_recommendation = self.generate_test_point(
             llm_output, X_recommend_scaled, self.global_scaler_recommend, type="Recommend"
         )
         test_point_recommendation_np = test_point_recommendation.values[0]
         
-        knn = NearestNeighbors(n_neighbors=10, metric='euclidean')
+        # Use min of 10 or number of available beers
+        n_neighbors = min(10, len(X_recommend_scaled_np))
+        knn = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
         knn.fit(X_recommend_scaled_np)
         
         distances, indices = knn.kneighbors([test_point_recommendation_np])
         
-        top_10_beers = []
+        top_beers = []
         for i, idx in enumerate(indices[0]):
             beer_info = {
                 'name': y_recommend_np[idx][0],
@@ -427,17 +490,25 @@ class BeerRecommender:
                 'distance': distances[0][i],
                 'index': idx
             }
-            top_10_beers.append(beer_info)
+            top_beers.append(beer_info)
         
-        for beer in top_10_beers:
+        for beer in top_beers:
             beer['quality_score'] = self.get_quality_score(beer['rating'], beer['num_reviews'])
         
-        top_10_beers.sort(key=lambda x: x['quality_score'], reverse=True)
+        top_beers.sort(key=lambda x: x['quality_score'], reverse=True)
         
-        return top_10_beers[:3]
+        return top_beers[:3]
     
-    def get_recommendations(self, user_input):
+    def get_recommendations(self, user_input, region=None):
+        # Get LLM features
         llm_output = self.get_beer_features_from_text(user_input)
+        
+        # Override region if specified by user in UI
+        if region is not None:
+            llm_output['region'] = region
+        elif 'region' not in llm_output:
+            llm_output['region'] = None
+        
         predicted_rating = self.predict_rating(llm_output)
         
         # Get regular recommendations
