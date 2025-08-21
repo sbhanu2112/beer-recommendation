@@ -91,6 +91,7 @@ The comprehensive [Beer Profile and Ratings Dataset](https://www.kaggle.com/data
   "Malty": 50,
   "mainstream": 1,
   "style": "Wheat Beer"
+  "region": None
 }
 ```
 
