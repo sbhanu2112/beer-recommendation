@@ -82,6 +82,13 @@ st.markdown(f"""
         border-radius: 4px;
     }}
     
+    /* Clean select box styling */
+    .stSelectbox > div > div > div {{
+        background-color: rgba(255, 255, 255, 0.95);
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }}
+    
     /* Title styling with background for readability */
     h1 {{
         color: #212529;
@@ -110,10 +117,14 @@ def load_recommender():
     recommender.train_regression_model()
     return recommender
 
-def format_terminal_output(prompt, predicted_rating, recommendations, alt_recommendations=None):
+def format_terminal_output(prompt, predicted_rating, recommendations, alt_recommendations=None, region=None):
     """Format output exactly like beer_expected.ipynb"""
     
-    output = f"User Prompt = {prompt}\n"
+    # Include region in the prompt display if not Global
+    if region and region != "Global":
+        output = f"User Prompt = {prompt} (Region: {region})\n"
+    else:
+        output = f"User Prompt = {prompt}\n"
     
     if alt_recommendations is not None:
         # Low rating warning
@@ -121,9 +132,9 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         output += f"⚠️  Warning: This flavor combination typically rates {predicted_rating:.2f}/5\n"
         output += "━" * 60 + "\n\n"
         
-        output += "📍 Here's what matches your exact request:\n"
+        output += "🔍 Here's what matches your exact request:\n"
         if recommendations:
-            for i, beer in enumerate(recommendations[:3], 1):
+            for i, beer in enumerate(recommendations[:2], 1):
                 output += f"{i}. {beer['name']} ({beer['rating']:.2f}★ - {int(beer['num_reviews'])} reviews)\n"
                 output += f"   Distance: {beer['distance']:.3f}\n"
         else:
@@ -131,7 +142,7 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         
         output += "\n💡 Suggested Alternatives (similar but better rated):\n"
         if alt_recommendations:
-            for i, beer in enumerate(alt_recommendations[:3], 1):
+            for i, beer in enumerate(alt_recommendations[:2], 1):
                 output += f"{i}. {beer['name']} ({beer['rating']:.2f}★ - {int(beer['num_reviews'])} reviews)\n"
                 output += f"   Distance: {beer['distance']:.3f}\n"
         else:
@@ -147,8 +158,8 @@ def format_terminal_output(prompt, predicted_rating, recommendations, alt_recomm
         output += "━" * 60 + "\n\n"
         
         output += "🍺 Top Recommendations:\n"
-        for i, beer in enumerate(recommendations[:3], 1):
-            output += f"{i}. {beer['name']}\n"
+        for i, beer in enumerate(recommendations[:2], 1):
+            output += f"\n{i}. {beer['name']}\n"
             output += f"   Rating: {beer['rating']:.2f}/5 ({int(beer['num_reviews'])} reviews)\n"
             output += f"   Distance: {beer['distance']:.3f}\n"
             
@@ -184,28 +195,43 @@ def main():
     if 'selected_query' not in st.session_state:
         st.session_state.selected_query = ""
     
-    # Input section - now connected to session state
-    user_input = st.text_input(
-        "**Tell us what you\'re craving and we\'ll find your perfect beer**",
-        value=st.session_state.selected_query,  # Use session state value
-        placeholder="e.g., I want a hoppy IPA with tropical notes",
-        help="Describe the type of beer you're looking for",
-        key="beer_input"
-    )
+    # Create two columns for input and region selection
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        # Input section - now connected to session state
+        user_input = st.text_input(
+            "**Tell us what you're craving and we'll find your perfect beer**",
+            value=st.session_state.selected_query,  # Use session state value
+            placeholder="e.g., I want a hoppy IPA with tropical notes",
+            help="Describe the type of beer you're looking for",
+            key="beer_input"
+        )
+    
+    with col2:
+        # Region selection dropdown
+        region_options = ["Global", "United States", "Belgium", "Germany", "United Kingdom", "Canada", "Japan"]
+        selected_region = st.selectbox(
+            "**Select Region**",
+            options=region_options,
+            index=0,  # Default to "Global"
+            help="Filter recommendations by country of origin",
+            key="region_select"
+        )
     
     # Update session state when user types
     if user_input != st.session_state.selected_query:
         st.session_state.selected_query = user_input
     
     # Example queries
-    st.markdown("**Can't make up your mind? Try these:**")
+    st.markdown("**Can't make your mind? Try these:**")
     
     examples = [
         "I want a light 🍊 citrusy beer",
         "Give me a 🌺 hoppy IPA with tropical notes",
         "I want a sessionable pilsner",
         "Something 🍋 sour and funky with brett character",
-        "Just a Bad beer 😐"
+        "Just a Bad beer"
     ]
     
     # Create buttons in columns
@@ -221,15 +247,19 @@ def main():
         if user_input:
             with st.spinner("Analyzing your request..."):
                 try:
-                    # Get recommendations
-                    results = recommender.get_recommendations(user_input)
+                    # Convert "Global" to None for the backend
+                    region_param = None if selected_region == "Global" else selected_region
+                    
+                    # Get recommendations with region parameter
+                    results = recommender.get_recommendations(user_input, region=region_param)
                     
                     # Format output
                     terminal_output = format_terminal_output(
                         user_input,
                         results['predicted_rating'],
                         results['recommendations'],
-                        results.get('alt_recommendations')
+                        results.get('alt_recommendations'),
+                        region=selected_region
                     )
                     
                     # Display in terminal style
@@ -252,9 +282,14 @@ def main():
         - **Gradient Boosting** to predict beer ratings
         - **K-Nearest Neighbors** to find similar beers
         - **Quality Scoring** based on ratings and review counts
+        - **Region Filtering** to find beers from specific countries
         
-        The system analyzes **3,197 craft beers** and will warn you if your requested 
+        The system analyzes **3,197 craft beers** from around the world and will warn you if your requested 
         combination might not taste good (predicted rating < 3.0/5).
+        
+        **Region Options:**
+        - **Global**: Search across all countries
+        - **Country-specific**: Filter results to beers from United States, Belgium, Germany, United Kingdom, Canada, or Japan
         """)
 
 if __name__ == "__main__":
